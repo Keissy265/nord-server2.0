@@ -1,40 +1,41 @@
-import asyncio
-import websockets
+from flask import Flask, request, jsonify
+from flask_socketio import SocketIO, emit
+import random
 import json
-import os
 
-DERIV_APP_ID = "109202"
-DERIV_TOKEN = "JI3uwFsEkJUkViz"
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-clients = set()
+# Store latest ticks
+latest_ticks = []
 
-async def deriv_stream():
-    url = f"wss://ws.derivws.com/websockets/v3?app_id={DERIV_APP_ID}"
-    async with websockets.connect(url) as ws:
-        await ws.send(json.dumps({"authorize": DERIV_TOKEN}))
-        await ws.recv()
-        await ws.send(json.dumps({"ticks_subscribe": "R_100"}))
-        print("✅ Subscribed to ticks...")
+@app.route('/')
+def home():
+    return jsonify({"status": "Nord AI Python Server is running..."})
 
-        while True:
-            msg = await ws.recv()
-            for client in clients:
-                try:
-                    await client.send(msg)
-                except:
-                    pass
+@app.route('/tick', methods=['POST'])
+def receive_tick():
+    data = request.get_json()
+    if not data or "tick" not in data:
+        return jsonify({"error": "Invalid data"}), 400
 
-async def client_handler(websocket, path):
-    clients.add(websocket)
-    try:
-        async for msg in websocket:
-            print("📩 Client message:", msg)
-    finally:
-        clients.remove(websocket)
+    latest_ticks.append(data["tick"])
+    if len(latest_ticks) > 50:
+        latest_ticks.pop(0)
 
-async def main():
-    server = await websockets.serve(client_handler, "0.0.0.0", int(os.environ.get("PORT", 8080)))
-    print("🚀 Nord Server running on Render...")
-    await deriv_stream()
+    # Emit tick to all websocket clients
+    socketio.emit("tick_update", {"tick": data["tick"]})
+    return jsonify({"status": "received"})
+
+
+# Simple random decision for demo
+@socketio.on("request_decision")
+def handle_decision(data):
+    # Random signal for now
+    decision = random.choice(["BUY", "SELL", "HOLD"])
+    print(f"Decision sent: {decision}")
+    emit("trade_signal", {"signal": decision})
+
+
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
