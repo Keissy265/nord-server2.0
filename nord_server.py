@@ -1,41 +1,32 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
+from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-import random
-import json
+import os
 
 app = Flask(__name__)
+CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Store latest ticks
-latest_ticks = []
-
-@app.route('/')
+@app.route("/")
 def home():
-    return jsonify({"status": "Nord AI Python Server is running..."})
+    return "✅ Nord Server 2.0 is running!"
 
-@app.route('/tick', methods=['POST'])
-def receive_tick():
-    data = request.get_json()
-    if not data or "tick" not in data:
-        return jsonify({"error": "Invalid data"}), 400
+@socketio.on("connect")
+def handle_connect():
+    print("🔌 Client connected!")
+    emit("server_message", {"data": "Welcome to Nord Server 2.0!"})
 
-    latest_ticks.append(data["tick"])
-    if len(latest_ticks) > 50:
-        latest_ticks.pop(0)
+@socketio.on("message")
+def handle_message(data):
+    print(f"📩 Message received: {data}")
+    emit("server_message", {"data": f"Echo: {data}"}, broadcast=True)
 
-    # Emit tick to all websocket clients
-    socketio.emit("tick_update", {"tick": data["tick"]})
-    return jsonify({"status": "received"})
-
-
-# Simple random decision for demo
-@socketio.on("request_decision")
-def handle_decision(data):
-    # Random signal for now
-    decision = random.choice(["BUY", "SELL", "HOLD"])
-    print(f"Decision sent: {decision}")
-    emit("trade_signal", {"signal": decision})
-
+@socketio.on("disconnect")
+def handle_disconnect():
+    print("❌ Client disconnected!")
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000, allow_unsafe_werkzeug=True)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"🚀 Running Nord server on port {port}")
+    # IMPORTANT — allow Flask-SocketIO to run safely on Render
+    socketio.run(app, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)
