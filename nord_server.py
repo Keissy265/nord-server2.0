@@ -36,6 +36,5 @@ async def main():
     server = await websockets.serve(client_handler, "0.0.0.0", int(os.environ.get("PORT", 8080)))
     print("🚀 Nord Server running on Render...")
     await deriv_stream()
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    socketio.run(app, host="0.0.0.0", port=5000)
