@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: nord-server2.0
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python nord_server.py"
+    plan: free
